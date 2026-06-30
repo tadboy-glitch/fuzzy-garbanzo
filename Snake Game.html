@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Game</title>
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #222 0%, #6c3483 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    .logo {
+      margin-top: 30px;
+      font-size: 6vw;
+      font-weight: bold;
+      color: #f7ca18;
+      letter-spacing: 2px;
+      text-shadow: 2px 2px 8px #6c3483;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      text-align: center;
+    }
+    .controls {
+      margin: 10px 0;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .scoreboard {
+      color: #fff;
+      font-size: 3vw;
+      margin-bottom: 10px;
+      text-shadow: 1px 1px 4px #6c3483;
+      text-align: center;
+    }
+    .difficulty {
+      margin-bottom: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: center;
+    }
+    .difficulty button {
+      padding: 1vw 3vw;
+      background: #f7ca18;
+      color: #6c3483;
+      border: none;
+      border-radius: 6px;
+      font-size: 2vw;
+      cursor: pointer;
+      box-shadow: 1px 1px 6px #222;
+      transition: background 0.2s;
+    }
+    .difficulty button.active {
+      background: #6c3483;
+      color: #fff;
+    }
+    button {
+      padding: 1vw 3vw;
+      background: #6c3483;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 2vw;
+      cursor: pointer;
+      box-shadow: 1px 1px 6px #222;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #f7ca18;
+      color: #6c3483;
+    }
+    canvas {
+      background: #111 !important;
+      border: 3px solid #f7ca18;
+      border-radius: 18px;
+      box-shadow: 0 0 24px #6c3483;
+      margin-bottom: 20px;
+      margin-top: 10px;
+      touch-action: none;
+      width: 90vw;
+      max-width: 1280px;
+      aspect-ratio: 16/9;
+      height: auto;
+      display: block;
+      transition: background 0.2s;
+    }
+    @media (max-width: 500px) {
+      .logo { font-size: 10vw; }
+      .scoreboard { font-size: 6vw; }
+      button, .difficulty button { font-size: 4vw; padding: 2vw 5vw; }
+      canvas { width: 95vw !important; height: 95vw !important; aspect-ratio: 1/1 !important; }
+    }
+    .touch-controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .touch-controls button {
+      font-size: 2vw;
+      padding: 1vw 2vw;
+      border-radius: 50%;
+      background: #f7ca18;
+      color: #6c3483;
+      border: none;
+      box-shadow: 1px 1px 6px #222;
+    }
+    @media (max-width: 500px) {
+      .touch-controls button { font-size: 5vw; padding: 3vw 5vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="logo" id="logo">🐍 SNAKE XTREME</div>
+  <div class="difficulty" id="difficulty">
+    <button id="easyBtn" class="active">Easy</button>
+    <button id="normalBtn">Normal</button>
+    <button id="hardBtn">Hard</button>
+  </div>
+  <div class="controls" id="controls">
+    <button id="pauseBtn">Pause</button>
+    <button id="resumeBtn" style="display:none;">Resume</button>
+    <button id="fullscreenBtn">Fullscreen</button>
+  </div>
+  <div class="scoreboard" id="scoreboard">
+    Score: <span id="score">0</span> | High Score: <span id="highscore">0</span>
+  </div>
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div class="touch-controls" id="touch-controls">
+    <button onclick="setDir('up')">⬆️</button>
+    <button onclick="setDir('left')">⬅️</button>
+    <button onclick="setDir('down')">⬇️</button>
+    <button onclick="setDir('right')">➡️</button>
+  </div>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const grid = 20;
+    let snake = [{x: 200, y: 200}];
+    let dx = grid, dy = 0;
+    let food = {x: 0, y: 0, anim: 0};
+    let score = 0;
+    let highscore = localStorage.getItem('snakeHighScore') || 0;
+    let paused = false;
+    let gameInterval;
+    let speed = 120; // Default easy mode
+
+    document.getElementById('highscore').textContent = highscore;
+
+    function placeFood() {
+      food.x = Math.floor(Math.random() * (canvas.width / grid)) * grid;
+      food.y = Math.floor(Math.random() * (canvas.height / grid)) * grid;
+      food.anim = 0;
+    }
+
+    function draw() {
+      ctx.save();
+      ctx.globalAlpha = 0.2;
+      for (let i = 0; i < 10; i++) {
+        ctx.beginPath();
+        ctx.arc(canvas.width/2, canvas.height/2, 40 + i * 30 + (score * 2), 0, 2 * Math.PI);
+        ctx.strokeStyle = `rgba(76, 175, 80, ${0.08 + i * 0.02})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw animated food (pulsing effect)
+      food.anim += 0.15;
+      let pulse = 4 * Math.sin(food.anim) + grid;
+      ctx.save();
+      ctx.shadowColor = "#f7ca18";
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(food.x + grid/2, food.y + grid/2, pulse/2, 0, 2 * Math.PI);
+      ctx.fillStyle = '#f7ca18';
+      ctx.fill();
+      ctx.restore();
+
+      // Draw snake with gradual dragon transformation
+      ctx.save();
+      ctx.shadowColor = "#6c3483";
+      ctx.shadowBlur = 8;
+      snake.forEach((part, i) => {
+        ctx.beginPath();
+        // Gradually morph snake into a "dragon" as score increases
+        if (score < 10) {
+          // Normal snake (circle segments)
+          ctx.arc(part.x + grid/2, part.y + grid/2, grid/2, 0, 2 * Math.PI);
+          ctx.fillStyle = i === 0 ? "#f7ca18" : "#6c3483";
+        } else if (score < 20) {
+          // Snake gets "horns" and longer head
+          if (i === 0) {
+            ctx.ellipse(part.x + grid/2, part.y + grid/2, grid/2 + 4, grid/2, 0, 0, 2 * Math.PI);
+            ctx.fillStyle = "#f7ca18";
+            // Horns
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2 - 10, part.y + grid/2 - 16);
+            ctx.lineTo(part.x + grid/2 - 6, part.y + grid/2 - 4);
+            ctx.lineTo(part.x + grid/2 - 2, part.y + grid/2 - 16);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2 + 10, part.y + grid/2 - 16);
+            ctx.lineTo(part.x + grid/2 + 6, part.y + grid/2 - 4);
+            ctx.lineTo(part.x + grid/2 + 2, part.y + grid/2 - 16);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.restore();
+          } else {
+            ctx.arc(part.x + grid/2, part.y + grid/2, grid/2, 0, 2 * Math.PI);
+            ctx.fillStyle = "#6c3483";
+          }
+        } else {
+          // Dragon body: green, spiky, longer head, horns, and "fire"
+          if (i === 0) {
+            ctx.ellipse(part.x + grid/2, part.y + grid/2, grid/2 + 8, grid/2, 0, 0, 2 * Math.PI);
+            ctx.fillStyle = "#43ea2e";
+            // Horns
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2 - 12, part.y + grid/2 - 20);
+            ctx.lineTo(part.x + grid/2 - 6, part.y + grid/2 - 4);
+            ctx.lineTo(part.x + grid/2 - 2, part.y + grid/2 - 20);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2 + 12, part.y + grid/2 - 20);
+            ctx.lineTo(part.x + grid/2 + 6, part.y + grid/2 - 4);
+            ctx.lineTo(part.x + grid/2 + 2, part.y + grid/2 - 20);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.restore();
+            // Fire breath (simple triangle)
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2, part.y + grid/2 + 16);
+            ctx.lineTo(part.x + grid/2 - 6, part.y + grid/2 + 28);
+            ctx.lineTo(part.x + grid/2 + 6, part.y + grid/2 + 28);
+            ctx.closePath();
+            ctx.fillStyle = "#f7ca18";
+            ctx.globalAlpha = 0.7;
+            ctx.fill();
+            ctx.restore();
+          } else {
+            // Spiky dragon body
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(part.x + grid/2, part.y + grid/2, grid/2, 0, 2 * Math.PI);
+            ctx.fillStyle = "#43ea2e";
+            ctx.fill();
+            // Spikes
+            ctx.beginPath();
+            ctx.moveTo(part.x + grid/2, part.y + grid/2 - grid/2);
+            ctx.lineTo(part.x + grid/2 - 4, part.y + grid/2 - grid/2 - 8);
+            ctx.lineTo(part.x + grid/2 + 4, part.y + grid/2 - grid/2 - 8);
+            ctx.closePath();
+            ctx.fillStyle = "#fff";
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        ctx.fill();
+        // Eyes for the head
+        if (i === 0) {
+          ctx.beginPath();
+          ctx.arc(part.x + grid/2 - 4, part.y + grid/2 - 4, 3, 0, 2 * Math.PI);
+          ctx.arc(part.x + grid/2 + 4, part.y + grid/2 - 4, 3, 0, 2 * Math.PI);
+          ctx.fillStyle = "#fff";
+          ctx.fill();
+        }
+      });
+      ctx.restore();
+    }
+
+    function moveSnake() {
+      if (paused) return;
+      const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+      // Wall collision
+      if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
+        resetGame();
+        return;
+      }
+
+      // Self collision
+      for (let part of snake) {
+        if (head.x === part.x && head.y === part.y) {
+          resetGame();
+          return;
+        }
+      }
+
+      snake.unshift(head);
+
+      // Eat food
+      if (head.x === food.x && head.y === food.y) {
+        score++;
+        if (score > highscore) {
+          highscore = score;
+          localStorage.setItem('snakeHighScore', highscore);
+          document.getElementById('highscore').textContent = highscore;
+        }
+        document.getElementById('score').textContent = score;
+        placeFood();
+      } else {
+        snake.pop();
+      }
+    }
+
+    function resetGame() {
+      snake = [{x: 200, y: 200}];
+      dx = grid; dy = 0;
+      score = 0;
+      document.getElementById('score').textContent = score;
+      placeFood();
+    }
+
+    document.addEventListener('keydown', e => {
+      // Spacebar toggles pause/resume
+      if (e.code === 'Space') {
+        paused = !paused;
+        pauseBtn.style.display = paused ? 'none' : '';
+        resumeBtn.style.display = paused ? '' : 'none';
+        return;
+      }
+      // F key toggles fullscreen
+      if (e.key.toLowerCase() === 'f') {
+        const gameDiv = canvas;
+        if (!document.fullscreenElement) {
+          if (gameDiv.requestFullscreen) {
+            gameDiv.requestFullscreen();
+          } else if (gameDiv.webkitRequestFullscreen) {
+            gameDiv.webkitRequestFullscreen();
+          } else if (gameDiv.msRequestFullscreen) {
+            gameDiv.msRequestFullscreen();
+          }
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+          } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+          }
+        }
+        return;
+      }
+      if (paused) return;
+      if (e.key === 'ArrowUp' && dy === 0) { dx = 0; dy = -grid; }
+      else if (e.key === 'ArrowDown' && dy === 0) { dx = 0; dy = grid; }
+      else if (e.key === 'ArrowLeft' && dx === 0) { dx = -grid; dy = 0; }
+      else if (e.key === 'ArrowRight' && dx === 0) { dx = grid; dy = 0; }
+      else if (e.key === 'w' && dy === 0) { dx = 0; dy = -grid; }
+      else if (e.key === 's' && dy === 0) { dx = 0; dy = grid; }
+      else if (e.key === 'a' && dx === 0) { dx = -grid; dy = 0; }
+      else if (e.key === 'd' && dx === 0) { dx = grid; dy = 0; }
+    });
+
+    // Touch controls for mobile
+    let touchStartX = 0, touchStartY = 0;
+    canvas.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+    });
+    canvas.addEventListener('touchmove', e => {
+      if (paused) return;
+      const t = e.touches[0];
+      const dxTouch = t.clientX - touchStartX;
+      const dyTouch = t.clientY - touchStartY;
+      if (Math.abs(dxTouch) > Math.abs(dyTouch)) {
+        if (dxTouch > 0 && dx === 0) { dx = grid; dy = 0; }
+        else if (dxTouch < 0 && dx === 0) { dx = -grid; dy = 0; }
+      } else {
+        if (dyTouch > 0 && dy === 0) { dx = 0; dy = grid; }
+        else if (dyTouch < 0 && dy === 0) { dx = 0; dy = -grid; }
+      }
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+    });
+
+    // Touch control buttons
+    window.setDir = function(dir) {
+      if (paused) return;
+      if (dir === 'up' && dy === 0) { dx = 0; dy = -grid; }
+      else if (dir === 'down' && dy === 0) { dx = 0; dy = grid; }
+      else if (dir === 'left' && dx === 0) { dx = -grid; dy = 0; }
+      else if (dir === 'right' && dx === 0) { dx = grid; dy = 0; }
+    };
+
+    function gameLoop() {
+      moveSnake();
+      draw();
+    }
+
+    placeFood();
+    draw();
+
+    function startGame() {
+      if (gameInterval) clearInterval(gameInterval);
+      gameInterval = setInterval(gameLoop, speed);
+    }
+    startGame();
+
+    // Pause/Resume controls
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    pauseBtn.onclick = () => {
+      paused = true;
+      pauseBtn.style.display = 'none';
+      resumeBtn.style.display = '';
+    };
+    resumeBtn.onclick = () => {
+      paused = false;
+      resumeBtn.style.display = 'none';
+      pauseBtn.style.display = '';
+    };
+
+    // Fullscreen functionality
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    fullscreenBtn.onclick = () => {
+      const gameDiv = canvas;
+      if (gameDiv.requestFullscreen) {
+        gameDiv.requestFullscreen();
+      } else if (gameDiv.webkitRequestFullscreen) {
+        gameDiv.webkitRequestFullscreen();
+      } else if (gameDiv.msRequestFullscreen) {
+        gameDiv.msRequestFullscreen();
+      }
+    };
+
+    // Difficulty controls
+    const easyBtn = document.getElementById('easyBtn');
+    const normalBtn = document.getElementById('normalBtn');
+    const hardBtn = document.getElementById('hardBtn');
+    easyBtn.onclick = () => {
+      speed = 120;
+      setActiveDifficulty(easyBtn);
+      startGame();
+    };
+    normalBtn.onclick = () => {
+      speed = 80;
+      setActiveDifficulty(normalBtn);
+      startGame();
+    };
+    hardBtn.onclick = () => {
+      speed = 40;
+      setActiveDifficulty(hardBtn);
+      startGame();
+    };
+    function setActiveDifficulty(btn) {
+      [easyBtn, normalBtn, hardBtn].forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    // Make all options always visible, even in fullscreen
+    document.addEventListener('fullscreenchange', () => {
+      const ids = ['logo', 'difficulty', 'controls', 'scoreboard', 'touch-controls'];
+      if (document.fullscreenElement) {
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.style.position = 'fixed';
+            el.style.left = '50%';
+            el.style.transform = 'translateX(-50%)';
+            el.style.zIndex = '1001';
+          }
+        });
+        document.getElementById('logo').style.top = '20px';
+        document.getElementById('difficulty').style.top = '90px';
+        document.getElementById('controls').style.top = '150px';
+        document.getElementById('scoreboard').style.top = '210px';
+        document.getElementById('touch-controls').style.bottom = '30px';
+        document.getElementById('touch-controls').style.top = '';
+      } else {
+        ids.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.style.position = '';
+            el.style.left = '';
+            el.style.transform = '';
+            el.style.zIndex = '';
+            el.style.top = '';
+            el.style.bottom = '';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
